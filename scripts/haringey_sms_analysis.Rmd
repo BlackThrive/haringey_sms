@@ -61,6 +61,7 @@ Note that it has not yet been possible to acquire the data for the three Lambeth
 * Rate of episodes of physical restraint on wards
 * Percentage of people who are moderately or severely depressed prior to starting treatment with Talking Therapies
 
+The data sources for the indicators analysed in this report are provided in the Appendix. 
 
 # Procedure and Results
 
@@ -668,7 +669,7 @@ ggplot(plot_data, aes(ethnicity, percent_4_plus)) +
 ```{r}
 # children looked after plot
 
-data <- read.csv("../data/haringey_children_looked_after_2018_2019_v2.csv")
+data <- read.csv("../data/haringey_children_looked_after_2018_2019_v3.csv")
 
 total_data <- data %>%
   subset(ethnicity == "Black" | ethnicity == "White") %>%
