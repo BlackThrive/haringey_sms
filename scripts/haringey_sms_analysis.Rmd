@@ -29,6 +29,7 @@ htmltools::img(src = knitr::image_uri("../images/btg_logo.png"),
 library(tidyverse)
 library(gmodels)
 library(showtext)
+library(scales) # for commas in numbers
 showtext_auto(enable = F)
 # # font_add("archivo", 
 # #          regular = "../fonts/static/Archivo/Archivo-Regular.ttf",
@@ -547,9 +548,9 @@ To summarise the results:
 * Black individuals were `r round(100 * rr_df$rr[which(rr_df$short_name == "stop_search")],0) - 100`% (i.e., `r round(rr_df$rr[which(rr_df$short_name == "stop_search")], 2)` times) more likely than White individuals to be stopped and searched by Police.
 * Black households were `r round(100 * rr_df$rr[which(rr_df$short_name == "homeless")],0) - 100`% (i.e., `r round(rr_df$rr[which(rr_df$short_name == "homeless")], 2)` times) more likely than White households to be statutorily homeless and living in temporary accommodation.
 
-## Percentage breakdowns
+## Indicator breakdowns
 
-The figures below present a breakdown of the above findings in percentages.
+The above results are broken down below. For each indicator, the number of individuals of each ethnicity is plotted. A percentage is also presented, which represents the number as a proportion of the total population of each ethnicity. 
 
 ### Employment
 
@@ -568,26 +569,59 @@ total_data$denominator <- as.numeric(total_data$denominator)
 row.names(total_data) <- total_data$ethnicity
 
 plot_data <- subset(total_data, ethnicity == "black" | ethnicity == "white")
-plot_data$ethnicity <- c("White","Black")
+plot_data$ethnicity <- as.factor(c("White","Black"))
 plot_data$percentage <- plot_data$percentage * 100
 ```
 
 The employment rate for Black 16-64 year olds in Haringey from April 2020 to March 2021 was `r round(plot_data["black", "percentage"],2)`%, compared to `r round(plot_data["white","percentage"],2)`% for White 16-64 year olds. Black 16-64 year olds were `r round(100 * (1 - rr_df$rr[which(rr_df$short_name == "employment")]), 2)`% less likely than White 16-64 year olds to be in employment.
 
 ```{r include = TRUE}
-ggplot(plot_data, aes(ethnicity, percentage)) + 
-  geom_col(colour = "black", fill = bt_orange, width = .5) +
-  scale_y_continuous(limits =  c(0,100), breaks = seq(0,100,10), expand = c(0,0)) +
+# ggplot(plot_data, aes(ethnicity, percentage)) + 
+#   geom_col(colour = "black", fill = bt_orange, width = .5) +
+#   scale_y_continuous(limits =  c(0,100), breaks = seq(0,100,10), expand = c(0,0)) +
+#   theme(panel.background = element_rect(fill = "white"),
+#         plot.background = element_rect(fill = "white"),
+#         panel.grid.minor.y = element_blank(),
+#         panel.grid.major.y = element_blank(),
+#         panel.grid.major.x = element_blank(),
+#         axis.line = element_line(colour = "black"),
+#         axis.text = element_text(colour = "black"),
+#         axis.title = element_text(colour = "black")) +
+#   geom_label(aes(label = paste(round(percentage,2),"%", sep = ""))) +
+#   xlab("Ethnicity") + ylab("Percentage") + ggtitle("Percentage of 16-64 year olds in employment") 
+
+# set up values for line
+maxval <- max(plot_data$numerator) * 1.1
+lowval <- maxval - (maxval * .02)
+txtval <- maxval * 1.04
+lpos <- which(levels(plot_data$ethnicity) == "Black")
+rpos <- which(levels(plot_data$ethnicity) == "White")
+mpos <- (lpos + rpos) / 2
+line_df <- data.frame(a = c(lpos, lpos, rpos, rpos), b = c(lowval, maxval, maxval, lowval)) # df for line
+
+nudge_value <- max(plot_data$numerator * 0.085) # amount to nudge labels
+
+difference <- round(max(plot_data$percentage) - min(plot_data$percentage),2) # calculate % difference
+
+ggplot(plot_data, aes(ethnicity, numerator)) + 
+  geom_col(colour = "black", fill = "#ff9000", width = .5) +
+  scale_y_continuous(label = comma, expand = c(0,0), limits = c(0, maxval * 1.1)) + 
+  geom_line(data = line_df, aes(a, b)) +
+  annotate("text", x = mpos, y = txtval, label = paste0("Difference = ", difference, "%")) +
   theme(panel.background = element_rect(fill = "white"),
-        plot.background = element_rect(fill = "white"),
         panel.grid.minor.y = element_blank(),
         panel.grid.major.y = element_blank(),
         panel.grid.major.x = element_blank(),
-        axis.line = element_line(colour = "black"),
-        axis.text = element_text(colour = "black"),
-        axis.title = element_text(colour = "black")) +
-  geom_label(aes(label = paste(round(percentage,2),"%", sep = ""))) +
-  xlab("Ethnicity") + ylab("Percentage") + ggtitle("Percentage of 16-64 year olds in employment") 
+        plot.caption = element_text(face = "italic"),
+        axis.line = element_line(colour = "black")) +
+  geom_label(aes(label = scales::comma(numerator))) +
+  geom_label(aes(label = paste0(round(percentage,2),"%")), nudge_y = -nudge_value) +
+
+  #geom_label(aes(label = paste(numerator, "\n(",round(percentage,2),"%)", sep = ""))) +
+  xlab("Ethnicity") + ylab("Number") +
+  ggtitle("16-64 year olds in employment") +
+  labs(caption = "Note. Percentages represent the number as a proportion of the total population of each ethnicity")
+  
   
 ```
 
@@ -606,24 +640,66 @@ row.names(total_data) <- total_data$characteristic_type
 total_data <- total_data[,-c(1:3)]
 
 plot_data <- subset(total_data, characteristic_type == "Black" | characteristic_type == "White")
+plot_data <- plot_data %>%
+  mutate(
+    ethnicity = as.factor(plot_data$characteristic_type),
+    percentage = gld_percent
+  ) %>%
+  rename(
+    gld = gld_number
+  )
 ```
 
 In the 2018-2019 academic year, `r round(plot_data["Black","gld_percent"],2)`% of Black children, compared to `r round(plot_data["White","gld_percent"],2)`% of White children, were assessed as reaching a Good Level of Development at age 5. Black children were `r round(100 * (1 - rr_df$rr[which(rr_df$short_name == "gld")]), 2)`% less likely than White children to reach a Good Level of Development at age 5.
 
 ```{r include = TRUE}
-ggplot(plot_data, aes(characteristic_type, gld_percent)) + 
-  geom_col(fill = "#ff9000", colour = "black", width = .5) +
-  scale_y_continuous(limits =  c(0,100), breaks = seq(0,100,10), expand = c(0,0)) +
+# ggplot(plot_data, aes(characteristic_type, gld_percent)) + 
+#   geom_col(fill = "#ff9000", colour = "black", width = .5) +
+#   scale_y_continuous(limits =  c(0,100), breaks = seq(0,100,10), expand = c(0,0)) +
+#   theme(panel.background = element_rect(fill = "white"),
+#         plot.background = element_rect(fill = "white"),
+#         panel.grid.minor.y = element_blank(),
+#         panel.grid.major.y = element_blank(),
+#         panel.grid.major.x = element_blank(),
+#         axis.line = element_line(colour = "black"),
+#         axis.text = element_text(colour = "black"),
+#         axis.title = element_text(colour = "black")) +
+#   geom_label(aes(label = paste(round(gld_percent,2),"%", sep = ""))) +
+#   xlab("Ethnicity") + ylab("Percentage") + ggtitle("Percentage of children reaching a Good Level of Development")
+
+# set up values for line
+var <- plot_data$gld
+maxval <- max(var) * 1.2
+lowval <- maxval - (maxval * .02)
+txtval <- maxval * 1.04
+lpos <- which(levels(plot_data$ethnicity) == "Black")
+rpos <- which(levels(plot_data$ethnicity) == "White")
+mpos <- (lpos + rpos) / 2
+line_df <- data.frame(a = c(lpos, lpos, rpos, rpos), b = c(lowval, maxval, maxval, lowval)) # df for line
+
+nudge_value <- max(var * 0.1) # amount to nudge labels
+
+difference <- round(max(plot_data$percentage) - min(plot_data$percentage),2) # calculate % difference
+
+ggplot(plot_data, aes(ethnicity, gld)) + 
+  geom_col(colour = "black", fill = "#ff9000", width = .5) +
+  scale_y_continuous(label = comma, expand = c(0,0), limits = c(0, maxval * 1.15)) + 
+  geom_line(data = line_df, aes(a, b)) +
+  annotate("text", x = mpos, y = txtval, label = paste0("Difference = ", difference, "%")) +
   theme(panel.background = element_rect(fill = "white"),
-        plot.background = element_rect(fill = "white"),
         panel.grid.minor.y = element_blank(),
         panel.grid.major.y = element_blank(),
         panel.grid.major.x = element_blank(),
-        axis.line = element_line(colour = "black"),
-        axis.text = element_text(colour = "black"),
-        axis.title = element_text(colour = "black")) +
-  geom_label(aes(label = paste(round(gld_percent,2),"%", sep = ""))) +
-  xlab("Ethnicity") + ylab("Percentage") + ggtitle("Percentage of children reaching a Good Level of Development")
+        plot.caption = element_text(face = "italic"),
+        axis.line = element_line(colour = "black")) +
+  geom_label(aes(label = scales::comma(gld))) +
+  geom_label(aes(label = paste0(round(percentage,2),"%")), nudge_y = -nudge_value) +
+
+  #geom_label(aes(label = paste(numerator, "\n(",round(percentage,2),"%)", sep = ""))) +
+  xlab("Ethnicity") + ylab("Number") +
+  ggtitle("Children reaching a Good Level of Development") +
+  labs(caption = "Note. Percentages represent the number as a proportion of the total population of each ethnicity")
+  
 
 ```
 
@@ -643,7 +719,15 @@ total_data <- total_data[,-c(1)]
 
 plot_data <- subset(total_data, ethnicity == "BLACK" | ethnicity == "WHITE")
 
-plot_data$ethnicity <- c("Black","White")
+plot_data$ethnicity <- as.factor(c("Black","White"))
+
+plot_data <- plot_data %>%
+  mutate(
+    percentage = percent_4_plus
+  ) %>%
+  rename(
+    gcse = total_4_plus
+  )
 ```
 
 In the academic year 2019-2020, `r round(plot_data["black","percent_4_plus"],2)`% Black pupils and `r round(plot_data["white","percent_4_plus"],2)`% of White pupils achieved at least Level 4 in GCSE Maths and English. This difference was not statistically significant.
@@ -651,16 +735,50 @@ In the academic year 2019-2020, `r round(plot_data["black","percent_4_plus"],2)`
 ```{r include = TRUE}
 
 
-ggplot(plot_data, aes(ethnicity, percent_4_plus)) + 
+# ggplot(plot_data, aes(ethnicity, percent_4_plus)) + 
+#   geom_col(colour = "black", fill = "#ff9000", width = .5) +
+#   scale_y_continuous(limits =  c(0,100), breaks = seq(0,100,10), expand = c(0,0)) +
+#   theme(panel.background = element_rect(fill = "white"),
+#         panel.grid.minor.y = element_blank(),
+#         panel.grid.major.y = element_blank(),
+#         panel.grid.major.x = element_blank(),
+#         axis.line = element_line(colour = "black")) +
+#   geom_label(aes(label = paste(round(percent_4_plus,2),"%", sep = ""))) +
+#   xlab("Ethnicity") + ylab("Percentage") + ggtitle("Percentage of pupils achieving 4+ in GCSE Maths and English")
+
+# set up values for line
+var <- plot_data$gcse
+maxval <- max(var) * 1.2
+lowval <- maxval - (maxval * .02)
+txtval <- maxval * 1.04
+lpos <- which(levels(plot_data$ethnicity) == "Black")
+rpos <- which(levels(plot_data$ethnicity) == "White")
+mpos <- (lpos + rpos) / 2
+line_df <- data.frame(a = c(lpos, lpos, rpos, rpos), b = c(lowval, maxval, maxval, lowval)) # df for line
+
+nudge_value <- max(var * 0.1) # amount to nudge labels
+
+difference <- round(max(plot_data$percentage) - min(plot_data$percentage),2) # calculate % difference
+
+ggplot(plot_data, aes(ethnicity, gcse)) + 
   geom_col(colour = "black", fill = "#ff9000", width = .5) +
-  scale_y_continuous(limits =  c(0,100), breaks = seq(0,100,10), expand = c(0,0)) +
+  scale_y_continuous(label = comma, expand = c(0,0), limits = c(0, maxval * 1.15)) + 
+  geom_line(data = line_df, aes(a, b)) +
+  annotate("text", x = mpos, y = txtval, label = paste0("Difference = ", difference, "%")) +
   theme(panel.background = element_rect(fill = "white"),
         panel.grid.minor.y = element_blank(),
         panel.grid.major.y = element_blank(),
         panel.grid.major.x = element_blank(),
+        plot.caption = element_text(face = "italic"),
         axis.line = element_line(colour = "black")) +
-  geom_label(aes(label = paste(round(percent_4_plus,2),"%", sep = ""))) +
-  xlab("Ethnicity") + ylab("Percentage") + ggtitle("Percentage of pupils achieving 4+ in GCSE Maths and English")
+  geom_label(aes(label = scales::comma(gcse))) +
+  geom_label(aes(label = paste0(round(percentage,2),"%")), nudge_y = -nudge_value) +
+
+  #geom_label(aes(label = paste(numerator, "\n(",round(percentage,2),"%)", sep = ""))) +
+  xlab("Ethnicity") + ylab("Number") +
+  ggtitle("Pupils achieving 4+ in GCSE Maths and English") +
+  labs(caption = "Note. Percentages represent the number as a proportion of the total population of each ethnicity")
+
 
 ```
 
@@ -674,7 +792,8 @@ data <- read.csv("../data/haringey_children_looked_after_2018_2019_v3.csv")
 total_data <- data %>%
   subset(ethnicity == "Black" | ethnicity == "White") %>%
   mutate(
-    not_cla = pop - cla
+    not_cla = pop - cla,
+    ethnicity = as.factor(ethnicity)
   )
 
 row.names(total_data) <- total_data$ethnicity
@@ -683,19 +802,52 @@ row.names(total_data) <- total_data$ethnicity
 In the 2018-2019 financial year, `r round(total_data["Black","percentage"],2)`% of Black children, compared to `r round(total_data["White","percentage"],2)`% of White children, were looked after by the local authority. Black children were `r round(100 * rr_df$rr[which(rr_df$short_name == "cla")],0) - 100`% (i.e., `r round(rr_df$rr[which(rr_df$short_name == "cla")], 2)` times) more likely than White children to be looked after the local authority.
 
 ```{r include = TRUE}
-ggplot(total_data, aes(ethnicity, percentage)) +
-  geom_col(fill = "#ff9000", colour = "black", width = .5) +
-  scale_y_continuous(limits =  c(0,5), breaks = seq(0,5,1), expand = c(0,0)) +
+# ggplot(total_data, aes(ethnicity, percentage)) +
+#   geom_col(fill = "#ff9000", colour = "black", width = .5) +
+#   scale_y_continuous(limits =  c(0,5), breaks = seq(0,5,1), expand = c(0,0)) +
+#   theme(panel.background = element_rect(fill = "white"),
+#         plot.background = element_rect(fill = "white"),
+#         panel.grid.minor.y = element_blank(),
+#         panel.grid.major.y = element_blank(),
+#         panel.grid.major.x = element_blank(),
+#         axis.line = element_line(colour = "black"),
+#         axis.text = element_text(colour = "black"),
+#         axis.title = element_text(colour = "black")) +
+#   geom_label(aes(label = paste(round(percentage,2),"%", sep = ""))) +
+#   xlab("Ethnicity") + ylab("Percentage") + ggtitle("Percentage of children looked after by the local authority")
+
+# set up values for line
+var <- total_data$cla
+maxval <- max(var) * 1.2
+lowval <- maxval - (maxval * .02)
+txtval <- maxval * 1.04
+lpos <- which(levels(total_data$ethnicity) == "Black")
+rpos <- which(levels(total_data$ethnicity) == "White")
+mpos <- (lpos + rpos) / 2
+line_df <- data.frame(a = c(lpos, lpos, rpos, rpos), b = c(lowval, maxval, maxval, lowval)) # df for line
+
+nudge_value <- max(var * 0.1) # amount to nudge labels
+
+difference <- round(max(total_data$percentage) - min(total_data$percentage),2) # calculate % difference
+
+ggplot(total_data, aes(ethnicity, cla)) + 
+  geom_col(colour = "black", fill = "#ff9000", width = .5) +
+  scale_y_continuous(label = comma, expand = c(0,0), limits = c(0, maxval * 1.15)) + 
+  geom_line(data = line_df, aes(a, b)) +
+  annotate("text", x = mpos, y = txtval, label = paste0("Difference = ", difference, "%")) +
   theme(panel.background = element_rect(fill = "white"),
-        plot.background = element_rect(fill = "white"),
         panel.grid.minor.y = element_blank(),
         panel.grid.major.y = element_blank(),
         panel.grid.major.x = element_blank(),
-        axis.line = element_line(colour = "black"),
-        axis.text = element_text(colour = "black"),
-        axis.title = element_text(colour = "black")) +
-  geom_label(aes(label = paste(round(percentage,2),"%", sep = ""))) +
-  xlab("Ethnicity") + ylab("Percentage") + ggtitle("Percentage of children looked after by the local authority")
+        plot.caption = element_text(face = "italic"),
+        axis.line = element_line(colour = "black")) +
+  geom_label(aes(label = scales::comma(cla))) +
+  geom_label(aes(label = paste0(round(percentage,2),"%")), nudge_y = -nudge_value) +
+
+  #geom_label(aes(label = paste(numerator, "\n(",round(percentage,2),"%)", sep = ""))) +
+  xlab("Ethnicity") + ylab("Number") +
+  ggtitle("Children looked after by the local authority") +
+  labs(caption = "Note. Percentages represent the number as a proportion of the total population of each ethnicity")
 
 
 
@@ -765,7 +917,13 @@ self_defined_freq_data <- data %>%
 self_defined_freq_data <- as.data.frame(self_defined_freq_data)
 row.names(self_defined_freq_data) <- c("asian","black","other","white")
 
-plot_data <- subset(self_defined_freq_data, ethnicity == "Black" | ethnicity == "White")
+plot_data <- subset(self_defined_freq_data, ethnicity == "Black" | ethnicity == "White") %>%
+  mutate(
+    ethnicity = as.factor(ethnicity)
+  ) %>%
+  rename(
+    stopped = n
+  )
 ```
 
 From September 2020 to August 2021, `r round(plot_data["black","percentage"],2)`% of Black individuals, compared to `r round(plot_data["white","percentage"],2)`% of White individuals, were subject to Police Stop and Search in Haringey. Black individuals were `r round(100 * rr_df$rr[which(rr_df$short_name == "stop_search")],0) - 100`% (i.e., `r round(rr_df$rr[which(rr_df$short_name == "stop_search")], 2)` times) more likely than White individuals to be stopped and searched by Police.
@@ -773,19 +931,53 @@ From September 2020 to August 2021, `r round(plot_data["black","percentage"],2)`
 
 ```{r include = TRUE, echo = FALSE}
 
-ggplot(plot_data, aes(ethnicity, percentage)) + 
-  geom_col(fill = "#ff9000", colour = "black", width = .5) +
-  scale_y_continuous(limits =  c(0,20), breaks = seq(0,20,5), expand = c(0,0)) +
+# ggplot(plot_data, aes(ethnicity, percentage)) + 
+#   geom_col(fill = "#ff9000", colour = "black", width = .5) +
+#   scale_y_continuous(limits =  c(0,20), breaks = seq(0,20,5), expand = c(0,0)) +
+#   theme(panel.background = element_rect(fill = "white"),
+#         plot.background = element_rect(fill = "white"),
+#         panel.grid.minor.y = element_blank(),
+#         panel.grid.major.y = element_blank(),
+#         panel.grid.major.x = element_blank(),
+#         axis.line = element_line(colour = "black"),
+#         axis.text = element_text(colour = "black"),
+#         axis.title = element_text(colour = "black")) +
+#   geom_label(aes(label = paste(round(percentage,2),"%", sep = ""))) +
+#   xlab("Ethnicity") + ylab("Percentage") + ggtitle("Percentage of individuals subject to Police Stop and Search")
+
+# set up values for line
+var <- plot_data$stopped
+maxval <- max(var) * 1.2
+lowval <- maxval - (maxval * .02)
+txtval <- maxval * 1.04
+lpos <- which(levels(plot_data$ethnicity) == "Black")
+rpos <- which(levels(plot_data$ethnicity) == "White")
+mpos <- (lpos + rpos) / 2
+line_df <- data.frame(a = c(lpos, lpos, rpos, rpos), b = c(lowval, maxval, maxval, lowval)) # df for line
+
+nudge_value <- max(var * 0.1) # amount to nudge labels
+
+difference <- round(max(plot_data$percentage) - min(plot_data$percentage),2) # calculate % difference
+
+ggplot(plot_data, aes(ethnicity, stopped)) + 
+  geom_col(colour = "black", fill = "#ff9000", width = .5) +
+  scale_y_continuous(label = comma, expand = c(0,0), limits = c(0, maxval * 1.15)) + 
+  geom_line(data = line_df, aes(a, b)) +
+  annotate("text", x = mpos, y = txtval, label = paste0("Difference = ", difference, "%")) +
   theme(panel.background = element_rect(fill = "white"),
-        plot.background = element_rect(fill = "white"),
         panel.grid.minor.y = element_blank(),
         panel.grid.major.y = element_blank(),
         panel.grid.major.x = element_blank(),
-        axis.line = element_line(colour = "black"),
-        axis.text = element_text(colour = "black"),
-        axis.title = element_text(colour = "black")) +
-  geom_label(aes(label = paste(round(percentage,2),"%", sep = ""))) +
-  xlab("Ethnicity") + ylab("Percentage") + ggtitle("Percentage of individuals subject to Police Stop and Search")
+        plot.caption = element_text(face = "italic"),
+        axis.line = element_line(colour = "black")) +
+  geom_label(aes(label = scales::comma(stopped))) +
+  geom_label(aes(label = paste0(round(percentage,2),"%")), nudge_y = -nudge_value) +
+
+  #geom_label(aes(label = paste(numerator, "\n(",round(percentage,2),"%)", sep = ""))) +
+  xlab("Ethnicity") + ylab("Number") +
+  ggtitle("Individuals subject to Police Stop and Search") +
+  labs(caption = "Note. Percentages represent the number as a proportion of the total population of each ethnicity")
+
 
 ```
 
@@ -800,7 +992,6 @@ total_data <- data %>%
   subset(ethnicity == "Asian" | ethnicity == "Black" | ethnicity == "Mixed/multiple" | ethnicity == "Other" | ethnicity == "White")
 
 total_data <- total_data[order(total_data$ethnicity),]
-total_data$ethnicity <- as.factor(total_data$ethnicity)
 total_data$number_homeless <- as.numeric(total_data$number_homeless)
 row.names(total_data) <- total_data$ethnicity
 
@@ -818,27 +1009,68 @@ total_data <- total_data %>%
     number_not_homeless = pop - number_homeless
     )
 
-plot_data <- subset(total_data, ethnicity == "Black" | ethnicity == "White")
-plot_data$percentage <- plot_data$percentage * 100
+plot_data <- subset(total_data, ethnicity == "Black" | ethnicity == "White") %>%
+  mutate(
+    percentage = percentage * 100,
+    ethnicity = as.factor(ethnicity)
+  ) %>%
+  rename(
+    homeless = number_homeless
+  )
+
 ```
 
 In the 2020-2021 financial year, `r round(plot_data["Black","percentage"],2)`% of Black households, compared to `r round(plot_data["White","percentage"],2)`% of White households, were identified as in need of assistance (i.e., owed prevention or relief duty) because they were either homeless or at risk of becoming homeless. Black households were `r round(100 * rr_df$rr[which(rr_df$short_name == "homeless")],0) - 100`% (i.e., `r round(rr_df$rr[which(rr_df$short_name == "homeless")], 2)` times) more likely than White households to be statutorily homeless or at risk of becoming homeless.
 
 ```{r include = TRUE}
 
-ggplot(plot_data, aes(ethnicity, percentage)) + 
-  geom_col(fill = "#ff9000", colour = "black", width = .5) +
-  scale_y_continuous(limits =  c(0,5), breaks = seq(0,5,1), expand = c(0,0)) +
+# ggplot(plot_data, aes(ethnicity, percentage)) + 
+#   geom_col(fill = "#ff9000", colour = "black", width = .5) +
+#   scale_y_continuous(limits =  c(0,5), breaks = seq(0,5,1), expand = c(0,0)) +
+#   theme(panel.background = element_rect(fill = "white"),
+#         plot.background = element_rect(fill = "white"),
+#         panel.grid.minor.y = element_blank(),
+#         panel.grid.major.y = element_blank(),
+#         panel.grid.major.x = element_blank(),
+#         axis.line = element_line(colour = "black"),
+#         axis.text = element_text(colour = "black"),
+#         axis.title = element_text(colour = "black")) +
+#   geom_label(aes(label = paste(round(percentage,2),"%", sep = ""))) +
+#   xlab("Ethnicity") + ylab("Percentage") + ggtitle("Percentage of households statutorily homeless or at risk of being homeless")
+
+# set up values for line
+var <- plot_data$homeless
+maxval <- max(var) * 1.2
+lowval <- maxval - (maxval * .02)
+txtval <- maxval * 1.04
+lpos <- which(levels(plot_data$ethnicity) == "Black")
+rpos <- which(levels(plot_data$ethnicity) == "White")
+mpos <- (lpos + rpos) / 2
+line_df <- data.frame(a = c(lpos, lpos, rpos, rpos), b = c(lowval, maxval, maxval, lowval)) # df for line
+
+nudge_value <- max(var * 0.1) # amount to nudge labels
+
+difference <- round(max(plot_data$percentage) - min(plot_data$percentage),2) # calculate % difference
+
+ggplot(plot_data, aes(ethnicity, homeless)) + 
+  geom_col(colour = "black", fill = "#ff9000", width = .5) +
+  scale_y_continuous(label = comma, expand = c(0,0), limits = c(0, maxval * 1.15)) + 
+  geom_line(data = line_df, aes(a, b)) +
+  annotate("text", x = mpos, y = txtval, label = paste0("Difference = ", difference, "%")) +
   theme(panel.background = element_rect(fill = "white"),
-        plot.background = element_rect(fill = "white"),
         panel.grid.minor.y = element_blank(),
         panel.grid.major.y = element_blank(),
         panel.grid.major.x = element_blank(),
-        axis.line = element_line(colour = "black"),
-        axis.text = element_text(colour = "black"),
-        axis.title = element_text(colour = "black")) +
-  geom_label(aes(label = paste(round(percentage,2),"%", sep = ""))) +
-  xlab("Ethnicity") + ylab("Percentage") + ggtitle("Percentage of households statutorily homeless or at risk of being homeless")
+        plot.caption = element_text(face = "italic"),
+        axis.line = element_line(colour = "black")) +
+  geom_label(aes(label = scales::comma(homeless))) +
+  geom_label(aes(label = paste0(round(percentage,2),"%")), nudge_y = -nudge_value) +
+
+  #geom_label(aes(label = paste(numerator, "\n(",round(percentage,2),"%)", sep = ""))) +
+  xlab("Ethnicity") + ylab("Number") +
+  ggtitle("Households statutorily homeless or at risk of becoming homeless") +
+  labs(caption = "Note. Percentages represent the number as a proportion of the total population of each ethnicity")
+
 ```
 
 # Authors
