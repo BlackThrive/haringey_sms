@@ -40,7 +40,7 @@ The script uses the following R packages. These need to be installed using <b>in
 
 ### Data
 
-**data/haringey_stop_search_2020_2021_v2.csv**: Stop and Search data for Haringey. csv file within eeds to be unzipped to data folder
+**data/haringey_stop_search_2020_2021_v2.csv**: Stop and Search data for Haringey
 
 **data/haringey_children_looked_after_2018_2019_v3.csv**: Data for Children Looked After indicator
 
